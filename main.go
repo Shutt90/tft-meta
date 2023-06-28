@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -43,6 +44,8 @@ type playerInfo struct {
 }
 
 func main() {
+	start := time.Now()
+
 	godotenv.Load()
 	var apiKey ApiKey
 	apiKey.string = os.Getenv("RIOT_API_KEY")
@@ -70,10 +73,9 @@ func main() {
 			fmt.Printf("Could not unmarshal PUUID: %v", err)
 		}
 
-		thisPlayerInfo.Matches = apiKey.ScanPlayerMatches(thisPlayerInfo.PUUID)
+		go thisPlayerInfo.addPlayerMatches(apiKey, i, challenger)
 
 		challenger.Players[i].PlayerInfo = thisPlayerInfo
-
 	}
 
 	json, err := json.Marshal(challenger)
@@ -82,6 +84,7 @@ func main() {
 	}
 
 	fmt.Println(string(json))
+	fmt.Println(time.Since(start))
 }
 
 func (api *ApiKey) execute(method string, url string) ([]byte, error) {
@@ -107,8 +110,8 @@ func (api *ApiKey) execute(method string, url string) ([]byte, error) {
 	return body, nil
 }
 
-func (api *ApiKey) ScanPlayerMatches(p string) []string {
-	url := fmt.Sprintf("https://europe.api.riotgames.com/tft/match/v1/matches/by-puuid/%s/ids?start=0&count=20", p)
+func (p *playerInfo) addPlayerMatches(api ApiKey, playerIndex int, tier Tier) {
+	url := fmt.Sprintf("https://europe.api.riotgames.com/tft/match/v1/matches/by-puuid/%s/ids?start=0&count=20", p.PUUID)
 	body, err := api.execute("GET", url)
 	if err != nil {
 		panic(err)
@@ -120,5 +123,5 @@ func (api *ApiKey) ScanPlayerMatches(p string) []string {
 		panic(err)
 	}
 
-	return matches
+	tier.Players[playerIndex].PlayerInfo.Matches = matches
 }
